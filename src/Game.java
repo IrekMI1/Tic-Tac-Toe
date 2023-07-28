@@ -1,3 +1,6 @@
+import java.io.FileInputStream;
+import java.io.FileOutputStream;
+import java.io.IOException;
 import java.util.Random;
 import java.util.Scanner;
 
@@ -45,17 +48,26 @@ public class Game {
     /**
      * Метод, который позволяет сделать ход пользователю. Пользователь через консоль вводит
      * координаты поля через пробел (строка столбец), на который ставится "крестик". При вводе невалиных координат
-     * повторно запрашиваются кначения
+     * повторно запрашиваются кначения. При вводе "s" состояние поля сохраняется и игра завершается.
+     * @return true, если пользователь совершил ход; false, если игра сохраняется.
      */
-    private static void humanTurn() {
+    private static boolean humanTurn() {
         int x, y;
 
         do {
-            System.out.printf("Введите кооринаты X и Y (от 1 до %d) через пробел:\n", fieldSize);
-            x = SCANNER.nextInt() - 1;
-            y = SCANNER.nextInt() - 1;
+            System.out.printf("Введите кооринаты X и Y (от 1 до %d) через пробел. " +
+                    "Для сохранения игры нажмите 's':\n", fieldSize);
+            String input = SCANNER.nextLine();
+            if (input.equals("s")) {
+                Game.saveGame();
+                return false;
+            }
+            x = Integer.parseInt(input.split(" ")[0]) - 1;
+            y = Integer.parseInt(input.split(" ")[1]) - 1;
+
         } while (!isCellValid(x, y) || !isCellEmpty(x, y));
         field[x][y] = DOT_HUMAN;
+        return true;
     }
 
     /**
@@ -174,20 +186,87 @@ public class Game {
     }
 
     /**
-     * Метод, который является точкой входа в игру.
-     * @param args стандартные аргументы метода main
+     * Метод, который сохраняет текущее состояние поля игры в текстовый фойл "gameSave.txt
+     * в виде последовательности символов."
      */
-    public static void main(String[] args) {
-        Game.initialize(3);
+    private static void saveGame() {
+        try (FileOutputStream fos = new FileOutputStream("gameSave.txt")) {
+            for (int i = 0; i < fieldSize; i++) {
+                for (int j = 0; j < fieldSize; j++) {
+                    fos.write(field[i][j]);
+                }
+            }
+            System.out.println("Игра успешно сохранена.");
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+    }
 
-        while (true) {
-            Game.humanTurn();
+    public static boolean canSave() {
+        System.out.println("Сохранить игру? y - да, n - нет");
+        Scanner scanner = new Scanner(System.in);
+        return scanner.next().equals("y");
+    }
+
+    /**
+     * Метод, который загружает состояние поля игры из текстового фойла "gameSave.txt" и продолжает сохраненную игру.
+     */
+    public static void loadGame() {
+        try (FileInputStream fis = new FileInputStream("gameSave.txt")) {
+            byte[] backup = fis.readAllBytes();
+            Game.initialize(
+                    (int) Math.sqrt(backup.length)
+            );
+            int x = 0;
+            for (int i = 0; i < fieldSize; i++) {
+                for (int j = 0; j < fieldSize; j++) {
+                    field[i][j] = (char) backup[x++] ;
+                }
+            }
+            System.out.println("Последняя игра загружена успешно.\n");
+            Game.printField();
+            Game.start();
+        } catch (IOException e) {
+            System.out.println("Сохраненная игра отсутсвует.");
+        }
+    }
+
+    /**
+     * Метод, который запускает игру и предоставляет ход пользователю и компьютеру.
+     */
+    public static void start() {
+
+        while (Game.humanTurn()) {
             Game.printField();
             if (Game.gameCheck(DOT_HUMAN, "You won!")) break;
 
             Game.aiTurn();
             Game.printField();
             if (Game.gameCheck(DOT_AI, "Computer won!")) break;
+        }
+    }
+
+    /**
+     * Метод, который является точкой входа в игру.
+     * @param args стандартные аргументы метода main
+     */
+    public static void main(String[] args) {
+
+        Scanner scanner = new Scanner(System.in);
+        System.out.println("""
+                Выберите действие:\s
+                n - новая игра
+                l - загрузить последнее сохранение
+                любой - выход""");
+
+        String flag = scanner.next();
+
+        if (flag.equals("n")) {
+            System.out.println("Выберите размер стороны поля: \t");
+            Game.initialize(scanner.nextInt());
+            Game.start();
+        } else if (flag.equals("l")) {
+            Game.loadGame();
         }
     }
 }
